@@ -1,0 +1,4 @@
+name: LogDrop
+version: '${project.version}'
+main: be.achent.logdrop.LogDrop
+load: STARTUP

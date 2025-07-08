@@ -1,4 +1,15 @@
 name: LogDrop
 version: '${project.version}'
+api-version: 1.12
 main: be.achent.logdrop.LogDrop
-load: STARTUP
+
+commands:
+  logdrop:
+    description: Commande principale pour consulter les logs des drops
+    usage: /<command> [player|history|rayon <valeur>|reload]
+    permission: logdrop.use
+
+permissions:
+  logdrop.use:
+    description: Permet d'utiliser la commande /logdrop
+    default: op

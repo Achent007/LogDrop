@@ -1,0 +1,2 @@
+logs-expire-after: "7d" # peut être "6h", "15m", "30s", "2d4h"
+logs-per-page: 10

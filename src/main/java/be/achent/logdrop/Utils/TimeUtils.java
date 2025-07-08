@@ -3,11 +3,11 @@ package be.achent.logdrop.Utils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class TimeParser {
+public class TimeUtils {
 
-    public static long parseDuration(String input) {
+    public static long parseTime(String input) {
         long total = 0L;
-        Matcher matcher = Pattern.compile("(\\d+)([dhms])").matcher(input);
+        Matcher matcher = Pattern.compile("(\\d+)([dhms])").matcher(input.toLowerCase());
         while (matcher.find()) {
             int value = Integer.parseInt(matcher.group(1));
             switch (matcher.group(2)) {

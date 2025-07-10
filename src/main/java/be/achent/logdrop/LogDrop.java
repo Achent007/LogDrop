@@ -23,6 +23,7 @@ public class LogDrop extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new DropListener(), this);
         getCommand("logdrop").setExecutor(new LogCommand(this));
+        getCommand("logdrop").setTabCompleter(new LogCommand(this));
 
         getLogger().info("LogDrop activé !");
     }

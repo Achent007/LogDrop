@@ -12,12 +12,15 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class DropLogger {
 
     private static final File file = new File(LogDrop.getInstance().getDataFolder(), "droplogs.yml");
     private static final YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-    private static final SimpleDateFormat fullDateFormat = new SimpleDateFormat("dd-MM-yyyy à HH'h'mm'min'ss's'");
+    private static final SimpleDateFormat fullDateFormat = new SimpleDateFormat("dd/MM/yyyy à HH'h'mm'min'ss's'");
+
+    private static final Map<String, List<String>> dropLogs = new HashMap<>();
 
     public static void init() {
         purgeOldLogs();
@@ -42,7 +45,7 @@ public class DropLogger {
                 .replace("%z%", String.valueOf(location.getBlockZ()))
                 .replace("%world%", location.getWorld().getName());
 
-        String entry = line + ";" + hover;
+        String entry = player.getName() + "|" + line + ";" + hover;
         List<String> logs = config.getStringList("logs");
         logs.add(entry);
         config.set("logs", logs);
@@ -50,23 +53,23 @@ public class DropLogger {
     }
 
     public static List<String> getAllLogs() {
-        return config.getStringList("logs");
+        List<String> logs = config.getStringList("logs");
+        Collections.reverse(logs);
+        return logs;
     }
 
     public static List<String> getLogs(String playerName) {
-        List<String> allLogs = getAllLogs();
-        List<String> filtered = new ArrayList<>();
+        loadDropLogs();
+        String lower = playerName.toLowerCase();
 
-        String lowerName = playerName.toLowerCase();
+        List<String> logs = dropLogs.entrySet().stream()
+                .filter(e -> e.getKey().equalsIgnoreCase(lower))
+                .flatMap(e -> e.getValue().stream())
+                .collect(Collectors.toList());
 
-        for (String log : allLogs) {
-            String messagePart = log.split(";", 2)[0].toLowerCase();
+        Collections.reverse(logs);
 
-            if (messagePart.contains(lowerName)) {
-                filtered.add(log);
-            }
-        }
-        return filtered;
+        return logs;
     }
 
     public static List<String> getLogsInRadius(Location center, int radius) {
@@ -99,13 +102,19 @@ public class DropLogger {
         return filtered;
     }
 
-    public static List<String> getLogsPaged(int page, int logsPerPage) {
-        List<String> allLogs = new ArrayList<>(getAllLogs());
-        Collections.reverse(allLogs);
-        int start = Math.max(0, (page - 1) * logsPerPage);
-        int end = Math.min(start + logsPerPage, allLogs.size());
-        if (start >= end) return Collections.emptyList();
-        return allLogs.subList(start, end);
+    public static void loadDropLogs() {
+        dropLogs.clear();
+        List<String> allLogs = config.getStringList("logs");
+        for (String log : allLogs) {
+            try {
+                String[] parts = log.split("\\|", 2);
+                if (parts.length < 2) continue;
+                String pseudo = parts[0].toLowerCase();
+
+                dropLogs.putIfAbsent(pseudo, new ArrayList<>());
+                dropLogs.get(pseudo).add(log);
+            } catch (Exception ignored) {}
+        }
     }
 
     private static void save() {
@@ -127,7 +136,6 @@ public class DropLogger {
         for (String log : current) {
             try {
                 long timestamp = getTimestamp(log, now);
-
                 if (now - timestamp <= expireMillis) {
                     filtered.add(log);
                 }
@@ -140,26 +148,23 @@ public class DropLogger {
         save();
     }
 
-    private static long getTimestamp(String log, long now) {
-        String[] parts = log.split(";", 2);
-        String timePart = parts[0];
-
-        String hourStr = timePart.substring(1, 3);
-        String minuteStr = timePart.substring(4, 6);
-        String secondStr = timePart.substring(10, 12);
-
-        Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(hourStr));
-        cal.set(Calendar.MINUTE, Integer.parseInt(minuteStr));
-        cal.set(Calendar.SECOND, Integer.parseInt(secondStr));
-        cal.set(Calendar.MILLISECOND, 0);
-
-        long timestamp = cal.getTimeInMillis();
-
-        if (timestamp > now) {
-            timestamp -= TimeUnit.DAYS.toMillis(1);
+    private static long getTimestamp(String log, long now) throws Exception {
+        String[] parts = log.split("\\|", 2);
+        if (parts.length < 2) {
+            throw new Exception("Format log invalide");
         }
-        return timestamp;
+
+        String message = parts[1];
+        int start = message.indexOf('[');
+        int end = message.indexOf(']');
+        if (start == -1 || end == -1 || end <= start) {
+            throw new Exception("Date non trouvée dans log");
+        }
+
+        String dateString = message.substring(start + 1, end);
+        SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy à HH'h'mm'min'ss's'");
+        Date date = format.parse(dateString);
+        return date.getTime();
     }
 
     private static long parseDurationToMillis(String input) {
@@ -175,18 +180,10 @@ public class DropLogger {
                 remaining = remaining.substring(i + 1);
 
                 switch (unit) {
-                    case 'd':
-                        millis += TimeUnit.DAYS.toMillis(value);
-                        break;
-                    case 'h':
-                        millis += TimeUnit.HOURS.toMillis(value);
-                        break;
-                    case 'm':
-                        millis += TimeUnit.MINUTES.toMillis(value);
-                        break;
-                    case 's':
-                        millis += TimeUnit.SECONDS.toMillis(value);
-                        break;
+                    case 'd': millis += TimeUnit.DAYS.toMillis(value); break;
+                    case 'h': millis += TimeUnit.HOURS.toMillis(value); break;
+                    case 'm': millis += TimeUnit.MINUTES.toMillis(value); break;
+                    case 's': millis += TimeUnit.SECONDS.toMillis(value); break;
                 }
             } else {
                 break;
